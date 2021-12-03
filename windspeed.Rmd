@@ -1,0 +1,58 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "")
+library(rstan)
+library(ggplot2)
+library(latex2exp)
+library(gridExtra)
+library(bayestestR)
+library(finalfit)
+library(reticulate)
+
+# options("digits" = 4)
+options(mc.cores = parallel::detectCores())
+```
+
+```{r}
+data = read.csv("data.csv")
+kk = data[data[, 3] == "maalis", 1:8]
+wp = rowMeans(kk[, 4:6])
+energy = kk[, 7]/kk[, 8]
+
+data = list(
+  N = length(kk[, 1]),
+  y = energy,
+  x = wp,
+  xpred = 2021
+)
+
+output = stan(file="windspeed.stan", data=data)
+samples = extract(output)
+```
+
+```{r}
+mean_theta_E = colMeans(samples$theta_E)
+qnt = matrix(nrow=40, ncol=2)
+for (i in 1:10){
+  qnt[i, ] = unname(quantile(samples$theta_E[, i], probs = c(0.05, 0.95))) 
+}
+ypred = samples$ypred
+wp_sort = sort(wp)
+```
+
+```{r}
+plot(sort(wp), sort(colMeans(samples$theta_E)), "l",
+     xlab = "Average windspeed", ylab = "Normalised energy [GW/GW]")
+points(wp, energy)
+
+hist(samples$theta)
+```
+
+```{python}
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots()
+ax.plot(wp_sort, mean_theta_E, '-')py_install("pandas")
+ax.fill_between(sort(wp), mean_theta_E - qnt[, 1], mean_theta_E - qnt[, 2], alpha=0.2)
+ax.plot(sort(wp), energia, 'o', color='tab:brown')
+```
